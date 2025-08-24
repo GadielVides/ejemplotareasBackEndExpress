@@ -1,4 +1,12 @@
 const { MongoClient } = require('mongodb');
+
+//Cargar variables según el entorno
+if(process.env.NODE_ENV === 'test'){
+  require('dotenv').config({ path: './.env.test'});
+} else {
+  require('dotenv').config({ path: './config.env'});
+}
+
 const connectionString = process.env.ATLAS_URI;
 const mongoURL = process.env.MONGO_URL || connectionString
 

@@ -1,15 +1,61 @@
 const express = require('express');
 const os = require('os');
 
-
-// recordRoutes is an instance of the express router.
-// We use it to define our routes.
-// The router will be added as a middleware and will take control of requests starting with path /listings.
 const recordRoutes = express.Router();
-
-// This will help us connect to the database
 const dbo = require('../db/conn');
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Tarea:
+ *       type: object
+ *       required:
+ *         - nombre
+ *         - hecho
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: ID único de la tarea
+ *           example: "507f1f77bcf86cd799439011"
+ *         nombre:
+ *           type: string
+ *           description: Nombre de la tarea
+ *           example: "Completar proyecto"
+ *         hecho:
+ *           type: boolean
+ *           description: Estado de completado de la tarea
+ *           example: false
+ *     TareaInput:
+ *       type: object
+ *       required:
+ *         - nombre
+ *         - hecho
+ *       properties:
+ *         nombre:
+ *           type: string
+ *           description: Nombre de la tarea
+ *           example: "Nueva tarea"
+ *         hecho:
+ *           type: boolean
+ *           description: Estado de completado
+ *           example: false
+ */
+
+/**
+ * @swagger
+ * /:
+ *   get:
+ *     summary: Información del servidor
+ *     tags: [Sistema]
+ *     responses:
+ *       200:
+ *         description: Información del sistema
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ */
 recordRoutes.route('/').get(async function (_req, res) {
   res.status(200).send('Bienvenido al Backend!!' 
   + "<br> Hostname = " + os.hostname()
@@ -19,19 +65,38 @@ recordRoutes.route('/').get(async function (_req, res) {
   );  
 });
 
+/**
+ * @swagger
+ * /error:
+ *   get:
+ *     summary: Endpoint de prueba de error
+ *     tags: [Sistema]
+ *     responses:
+ *       200:
+ *         description: Respuesta de error de prueba
+ */
 recordRoutes.route('/error').get(async function (_req, res) {
-  //AQUI BUSCAMOS TENER UN ERROR PARA QUE SE CAIGA EL BACKEND
-  //El sistema debe poder levantar el servicio de nuevo
-  
-
-
-  
   res.status(200).send('Error');  
 });
 
-
-
-// This section will help you get a list of all the records.
+/**
+ * @swagger
+ * /tareas:
+ *   get:
+ *     summary: Obtiene todas las tareas
+ *     tags: [Tareas]
+ *     responses:
+ *       200:
+ *         description: Lista de tareas obtenida exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Tarea'
+ *       400:
+ *         description: Error al obtener las tareas
+ */
 recordRoutes.route('/tareas').get(async function (_req, res) {
   const dbConnect = dbo.getDb();
 
@@ -48,9 +113,50 @@ recordRoutes.route('/tareas').get(async function (_req, res) {
     });
 });
 
-// This section will help you create a new record.
+/**
+ * @swagger
+ * /tareas:
+ *   post:
+ *     summary: Crea una nueva tarea
+ *     tags: [Tareas]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/TareaInput'
+ *     responses:
+ *       200:
+ *         description: Tarea creada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                   description: ID de la tarea creada
+ *       400:
+ *         description: Error al crear la tarea - datos faltantes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Los campos nombre y hecho son requeridos"
+ */
 recordRoutes.route('/tareas').post(function (req, res) {
   const dbConnect = dbo.getDb();
+  
+  // VALIDACIÓN AGREGADA ⭐
+  if (!req.body.nombre || req.body.hecho === undefined) {
+    return res.status(400).json({ 
+      error: 'Los campos nombre y hecho son requeridos' 
+    });
+  }
+
   const matchDocument = {
     nombre: req.body.nombre,
     hecho: req.body.hecho,
@@ -68,40 +174,139 @@ recordRoutes.route('/tareas').post(function (req, res) {
     });
 });
 
-/*
-// This section will help you update a record by id.
-recordRoutes.route('/listings/updateLike').post(function (req, res) {
+/**
+ * @swagger
+ * /tareas/{id}:
+ *   put:
+ *     summary: Actualiza una tarea existente
+ *     tags: [Tareas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID de la tarea a actualizar
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439011"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/TareaInput'
+ *           examples:
+ *             completar_tarea:
+ *               summary: Marcar tarea como completada
+ *               value:
+ *                 nombre: "Tarea completada"
+ *                 hecho: true
+ *             actualizar_nombre:
+ *               summary: Cambiar nombre de tarea
+ *               value:
+ *                 nombre: "Nuevo nombre de tarea"
+ *                 hecho: false
+ *     responses:
+ *       200:
+ *         description: Tarea actualizada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Tarea actualizada exitosamente"
+ *                 modifiedCount:
+ *                   type: integer
+ *                   example: 1
+ *       400:
+ *         description: Error al actualizar la tarea
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "ID de tarea inválido"
+ *       404:
+ *         description: Tarea no encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Tarea no encontrada"
+ */
+
+recordRoutes.route('/tareas/:id').put(function (req, res) {
+  var mongodb = require('mongodb');
+  var ObjectID = require('mongodb').ObjectID;
+  var update_id = req.params.id;
   const dbConnect = dbo.getDb();
-  const listingQuery = { _id: req.body.id };
-  const updates = {
-    $inc: {
-      likes: 1,
-    },
+
+  //Validar que el ID sea válido
+  if(!ObjectID.isValid(update_id)){
+    return res.status(400).json({error:'ID de tarea inválido'});
+  }
+
+  const filter = { "_id": new mongodb.ObjectID(update_id.toString())};
+  const updateDocument = {
+    $set:{
+      nombre: req.body.nombre,
+      hecho: req.body.hecho,
+    }
   };
 
   dbConnect
-    .collection('listingsAndReviews')
-    .updateOne(listingQuery, updates, function (err, _result) {
-      if (err) {
-        res
-          .status(400)
-          .send(`Error updating likes on listing with id ${listingQuery.id}!`);
+    .collection('Tarea')
+    .updateOne(filter, updateDocument, function (err, result){
+      if (err){
+        console.error('Error updating task:',err);
+        res.status(400).json({ error: 'Error al actualizar la tarea'});
+      } else if (result.matchedCount === 0){
+        res.status(404).json({ error: 'Tarea no encontrada'});
       } else {
-        console.log('1 document updated');
+        console.log(`Tarea actualizada con ID: ${update_id}`);
+        res.status(200).json({
+          message: 'Tarea actualizada exitosamente',
+          modifiedCount: result.modifiedCount
+        });
       }
     });
 });
-*/
 
-// This section will help you delete a record.
+
+/**
+ * @swagger
+ * /tareas/delete/{id}:
+ *   delete:
+ *     summary: Elimina una tarea por ID
+ *     tags: [Tareas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID de la tarea a eliminar
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439011"
+ *     responses:
+ *       204:
+ *         description: Tarea eliminada exitosamente
+ *       400:
+ *         description: Error al eliminar la tarea
+ */
 recordRoutes.route('/tareas/delete/:id').delete((req, res) => {
   var mongodb = require('mongodb');
   var ObjectID = require('mongodb').ObjectID;
-  var delete_id = req.params.id;//your id
+  var delete_id = req.params.id;
   const dbConnect = dbo.getDb();
 
   const listingQuery = { "_id": new mongodb.ObjectID(delete_id.toString()) };
-  //console.log(listingQuery);
+  
   dbConnect
     .collection('Tarea').deleteOne(listingQuery)
     .then(()=>{
